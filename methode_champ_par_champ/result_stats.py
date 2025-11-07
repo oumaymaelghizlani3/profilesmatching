@@ -9,7 +9,7 @@ EMBED_FILES = {
     "twitter":  "twitter_data_cleaned.json",
     "github":   "github_cleaned.json"
 }
-RESULTS_FOLDER = "results"
+RESULTS_FOLDER = "results2"
 
 # === Chargement des données ===
 def load_json(path):

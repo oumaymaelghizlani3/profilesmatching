@@ -4,61 +4,31 @@ This report compares two matching runs (BEFORE vs AFTER). It reports counts, per
 
 ## Pair: github->linkedin
 
-- Before: 476/3770 (12.63%)
-- After : 544/3770 (14.43%)
-- Delta (after - before): 68
-- Mutual pairs (before): 457
-- Mutual pairs (after): 513
-- Common A ids in reverse B (before): 457
-- Common B ids in reverse A (before): 459
+- Before: 0/3770 (0.0%)
+- After : 0/3770 (0.0%)
+- Delta (after - before): 0
+- Mutual pairs (before): 0
+- Mutual pairs (after): 0
+- Common A ids in reverse B (before): 0
+- Common B ids in reverse A (before): 0
 
 Examples (before):
 
-```
-{'profileA_index': 1, 'profileA_id': 'AnasAito', 'profileB_index': 1647, 'profileB_id': 'anas-ait-aomar-903826164', 'score': 0.8011447460523674, 'per_field': {'username': {'score': 0.8666666666666666, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.008013222366571426, 'weight': 0.2}}}
-```
-```
-{'profileA_index': 13, 'profileA_id': 'abdelkhalek-haddany', 'profileB_index': 1912, 'profileB_id': 'abdelkhalek-haddany', 'score': 0.8537473678588867, 'per_field': {'username': {'score': 1.0, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': -0.02376842498779297, 'weight': 0.2}}}
-```
-```
-{'profileA_index': 18, 'profileA_id': 'abdslam01', 'profileB_index': 1513, 'profileB_id': 'abdessalam-bahafid', 'score': 0.7512779709838685, 'per_field': {'username': {'score': 0.7722222222222221, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': -0.05772086977958679, 'weight': 0.2}}}
-```
-```
-{'profileA_index': 20, 'profileA_id': 'sihamhafsi', 'profileB_index': 1811, 'profileB_id': 'siham-hafsi-b16a0a205', 'score': 0.8236659046642634, 'per_field': {'username': {'score': 0.8952380952380953, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.07994704693555832, 'weight': 0.2}}}
-```
-```
-{'profileA_index': 25, 'profileA_id': 'hamza-douaioui', 'profileB_index': 2258, 'profileB_id': 'hamza-douaioui-28868b218', 'score': 0.8221639592333563, 'per_field': {'username': {'score': 0.9166666666666667, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.0051477146334946156, 'weight': 0.2}}}
-```
 
 Examples (after):
 
-```
-{'profileA_index': 1, 'profileA_id': 'AnasAito', 'profileB_index': 1647, 'profileB_id': 'anas-ait-aomar-903826164', 'score': 0.8335667836666106, 'per_field': {'username': {'score': 0.8666666666666666, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.46726229786872864, 'weight': 0.2}, 'repo_descriptions': {'score': 0.3689771592617035, 'weight': 0.1}}}
-```
-```
-{'profileA_index': 13, 'profileA_id': 'abdelkhalek-haddany', 'profileB_index': 1912, 'profileB_id': 'abdelkhalek-haddany', 'score': 0.8936496416727701, 'per_field': {'username': {'score': 1.0, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.4498653709888458, 'weight': 0.2}, 'repo_descriptions': {'score': 0.5050138831138611, 'weight': 0.1}}}
-```
-```
-{'profileA_index': 18, 'profileA_id': 'abdslam01', 'profileB_index': 1513, 'profileB_id': 'abdessalam-bahafid', 'score': 0.7992771869235568, 'per_field': {'username': {'score': 0.7722222222222221, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.4834480881690979, 'weight': 0.2}, 'repo_descriptions': {'score': 0.38892829418182373, 'weight': 0.1}}}
-```
-```
-{'profileA_index': 20, 'profileA_id': 'sihamhafsi', 'profileB_index': 1811, 'profileB_id': 'siham-hafsi-b16a0a205', 'score': 0.8490541174865904, 'per_field': {'username': {'score': 0.8952380952380953, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.49822959303855896, 'weight': 0.2}, 'repo_descriptions': {'score': 0.3679240047931671, 'weight': 0.1}}}
-```
-```
-{'profileA_index': 25, 'profileA_id': 'hamza-douaioui', 'profileB_index': 2258, 'profileB_id': 'hamza-douaioui-28868b218', 'score': 0.7869194271042942, 'per_field': {'username': {'score': 0.9166666666666667, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.15033532679080963, 'weight': 0.2}, 'repo_descriptions': {'score': 0.0031207529827952385, 'weight': 0.1}}}
-```
 
 ---
 
 ## Pair: github->twitter
 
-- Before: 604/3770 (16.02%)
-- After : 624/3770 (16.55%)
-- Delta (after - before): 20
-- Mutual pairs (before): 259
-- Mutual pairs (after): 275
-- Common A ids in reverse B (before): 283
-- Common B ids in reverse A (before): 268
+- Before: 1147/3770 (30.42%)
+- After : 1177/3770 (31.22%)
+- Delta (after - before): 30
+- Mutual pairs (before): 0
+- Mutual pairs (after): 0
+- Common A ids in reverse B (before): 0
+- Common B ids in reverse A (before): 0
 
 Examples (before):
 
@@ -69,13 +39,13 @@ Examples (before):
 {'profileA_index': 1, 'profileA_id': 'AnasAito', 'profileB_index': 263, 'profileB_id': 'anas_aito', 'score': 0.8418857300565356, 'per_field': {'username': {'score': 0.9777777777777777, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': -0.04013322293758392, 'weight': 0.2}}}
 ```
 ```
+{'profileA_index': 6, 'profileA_id': 'brahimbellahcen', 'profileB_index': 476, 'profileB_id': 'brahimakchmar', 'score': 0.7368696581196581, 'per_field': {'username': {'score': 0.8362393162393162, 'weight': 0.6}, 'name': {'score': 0.6375000000000001, 'weight': 0.6}}}
+```
+```
+{'profileA_index': 13, 'profileA_id': 'abdelkhalek-haddany', 'profileB_index': 2593, 'profileB_id': 'abdelhakimhaya', 'score': 0.7210056390977443, 'per_field': {'username': {'score': 0.856077694235589, 'weight': 0.6}, 'name': {'score': 0.5859335839598998, 'weight': 0.6}}}
+```
+```
 {'profileA_index': 14, 'profileA_id': 'mounirboulwafa', 'profileB_index': 1700, 'profileB_id': 'mounirmotawakil', 'score': 0.8009284832814245, 'per_field': {'username': {'score': 0.8856277056277057, 'weight': 0.6}, 'name': {'score': 0.7162292609351433, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 21, 'profileA_id': 'MohamedEZ-zaalyouy', 'profileB_index': 1651, 'profileB_id': 'mohamed_ahdidou', 'score': 0.7540058479532163, 'per_field': {'username': {'score': 0.8688888888888889, 'weight': 0.6}, 'name': {'score': 0.639122807017544, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 25, 'profileA_id': 'hamza-douaioui', 'profileB_index': 2763, 'profileB_id': 'hamzadouri', 'score': 0.8405952380952381, 'per_field': {'username': {'score': 0.9085714285714286, 'weight': 0.6}, 'name': {'score': 0.7726190476190475, 'weight': 0.6}}}
 ```
 
 Examples (after):
@@ -87,74 +57,74 @@ Examples (after):
 {'profileA_index': 1, 'profileA_id': 'AnasAito', 'profileB_index': 263, 'profileB_id': 'anas_aito', 'score': 0.9057691389606113, 'per_field': {'username': {'score': 0.9777777777777777, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.40705063939094543, 'weight': 0.2}}}
 ```
 ```
+{'profileA_index': 6, 'profileA_id': 'brahimbellahcen', 'profileB_index': 476, 'profileB_id': 'brahimakchmar', 'score': 0.7368696581196581, 'per_field': {'username': {'score': 0.8362393162393162, 'weight': 0.6}, 'name': {'score': 0.6375000000000001, 'weight': 0.6}}}
+```
+```
+{'profileA_index': 13, 'profileA_id': 'abdelkhalek-haddany', 'profileB_index': 2593, 'profileB_id': 'abdelhakimhaya', 'score': 0.7210056390977443, 'per_field': {'username': {'score': 0.856077694235589, 'weight': 0.6}, 'name': {'score': 0.5859335839598998, 'weight': 0.6}}}
+```
+```
 {'profileA_index': 14, 'profileA_id': 'mounirboulwafa', 'profileB_index': 1700, 'profileB_id': 'mounirmotawakil', 'score': 0.8009284832814245, 'per_field': {'username': {'score': 0.8856277056277057, 'weight': 0.6}, 'name': {'score': 0.7162292609351433, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 21, 'profileA_id': 'MohamedEZ-zaalyouy', 'profileB_index': 1651, 'profileB_id': 'mohamed_ahdidou', 'score': 0.7540058479532163, 'per_field': {'username': {'score': 0.8688888888888889, 'weight': 0.6}, 'name': {'score': 0.639122807017544, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 25, 'profileA_id': 'hamza-douaioui', 'profileB_index': 2763, 'profileB_id': 'hamzadouri', 'score': 0.8405952380952381, 'per_field': {'username': {'score': 0.9085714285714286, 'weight': 0.6}, 'name': {'score': 0.7726190476190475, 'weight': 0.6}}}
 ```
 
 ---
 
 ## Pair: linkedin->github
 
-- Before: 464/4276 (10.85%)
-- After : 540/4276 (12.63%)
-- Delta (after - before): 76
-- Mutual pairs (before): 457
-- Mutual pairs (after): 513
-- Common A ids in reverse B (before): 459
-- Common B ids in reverse A (before): 457
+- Before: 2410/4276 (56.36%)
+- After : 1097/4276 (25.65%)
+- Delta (after - before): -1313
+- Mutual pairs (before): 0
+- Mutual pairs (after): 0
+- Common A ids in reverse B (before): 0
+- Common B ids in reverse A (before): 0
 
 Examples (before):
 
 ```
-{'profileA_index': 78, 'profileA_id': 'ikrambenabdelouahab', 'profileB_index': 131, 'profileB_id': 'ikrambenabdelouahab', 'score': 0.7638609043150753, 'per_field': {'username': {'score': 1.0, 'weight': 0.6}, 'name': {'score': 0.8036363636363637, 'weight': 0.6}, 'bio': {'score': -0.06388276070356369, 'weight': 0.2}}}
+{'profileA_index': 1, 'profileA_id': 'yassir-mokhtari-01257a1a5', 'profileB_index': 206, 'profileB_id': 'yassiracharki', 'profileC_index': 2473, 'profileC_id': 'yassiracharki', 'score_ab': 0.6925899319967564, 'score_ac': 0.7254526080382234, 'score_bc': 0.9380746909550258, 'combined_score': 0.7853724103300018, 'per_field_combined': {'username': {'avg_score': 0.8866386946386946, 'sources': {'a-b': {'score': 0.829958041958042, 'weight': 0.6}, 'a-c': {'score': 0.829958041958042, 'weight': 0.6}, 'b-c': {'score': 1.0, 'weight': 0.6}}}, 'bio': {'avg_score': 0.3979288836320241, 'sources': {'a-b': {'score': 0.1986125409603119, 'weight': 0.2}, 'a-c': {'score': 0.42865127325057983, 'weight': 0.2}, 'b-c': {'score': 0.5665228366851807, 'weight': 0.2}}}, 'name': {'avg_score': 0.8132539682539682, 'sources': {'a-b': {'score': 0.7198809523809524, 'weight': 0.6}, 'a-c': {'score': 0.7198809523809524, 'weight': 0.6}, 'b-c': {'score': 1.0, 'weight': 0.6}}}}}
 ```
 ```
-{'profileA_index': 129, 'profileA_id': 'halimbahae', 'profileB_index': 463, 'profileB_id': 'halimbahae', 'score': 0.8406062562550818, 'per_field': {'username': {'score': 1.0, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': -0.11575620621442795, 'weight': 0.2}}}
+{'profileA_index': 4, 'profileA_id': 'yassine-ouhadi-3a8ab9235', 'profileB_index': 904, 'profileB_id': 'Yassine-Badri', 'profileC_index': 2468, 'profileC_id': 'yassinebridi', 'score_ab': 0.7427887451330571, 'score_ac': 0.7610409035409036, 'score_bc': 0.8474213286713288, 'combined_score': 0.7837503257817632, 'per_field_combined': {'username': {'avg_score': 0.8597837347837348, 'sources': {'a-b': {'score': 0.8512820512820513, 'weight': 0.6}, 'a-c': {'score': 0.8027777777777778, 'weight': 0.6}, 'b-c': {'score': 0.9252913752913753, 'weight': 0.6}}}, 'bio': {'avg_score': 0.4132574796676636, 'sources': {'a-b': {'score': 0.4132574796676636, 'weight': 0.2}, 'a-c': None, 'b-c': None}}, 'name': {'avg_score': 0.7443315018315019, 'sources': {'a-b': {'score': 0.7441391941391942, 'weight': 0.6}, 'a-c': {'score': 0.7193040293040293, 'weight': 0.6}, 'b-c': {'score': 0.769551282051282, 'weight': 0.6}}}}}
 ```
 ```
-{'profileA_index': 136, 'profileA_id': 'ennajari-abdellah', 'profileB_index': 390, 'profileB_id': 'ennajari', 'score': 0.8122002529872566, 'per_field': {'username': {'score': 0.8941176470588236, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.003048829734325409, 'weight': 0.2}}}
+{'profileA_index': 9, 'profileA_id': 'zakariabounou', 'profileB_index': 2307, 'profileB_id': 'zakaria-chahboun', 'profileC_index': 2535, 'profileC_id': 'zaki_chahboun', 'score_ab': 0.7459529584206442, 'score_ac': 0.732039604430504, 'score_bc': 0.8948251946941838, 'combined_score': 0.7909392525151108, 'per_field_combined': {'username': {'avg_score': 0.8828644349477682, 'sources': {'a-b': {'score': 0.9067307692307692, 'weight': 0.6}, 'a-c': {'score': 0.8304843304843305, 'weight': 0.6}, 'b-c': {'score': 0.9113782051282051, 'weight': 0.6}}}, 'bio': {'avg_score': 0.4582195580005646, 'sources': {'a-b': {'score': 0.3568355441093445, 'weight': 0.2}, 'a-c': {'score': 0.48818138241767883, 'weight': 0.2}, 'b-c': {'score': 0.5296417474746704, 'weight': 0.2}}}, 'name': {'avg_score': 0.8099206349206348, 'sources': {'a-b': {'score': 0.7148809523809524, 'weight': 0.6}, 'a-c': {'score': 0.7148809523809524, 'weight': 0.6}, 'b-c': {'score': 1.0, 'weight': 0.6}}}}}
 ```
 ```
-{'profileA_index': 188, 'profileA_id': 'mouad-yahya-24822860', 'profileB_index': 2202, 'profileB_id': 'Mouad-Sa', 'score': 0.7652738927738928, 'per_field': {'username': {'score': 0.845, 'weight': 0.6}, 'name': {'score': 0.6855477855477856, 'weight': 0.6}}}
+{'profileA_index': 14, 'profileA_id': 'yousseffatihi', 'profileB_index': 3737, 'profileB_id': 'youssefabidi13', 'profileC_index': 2505, 'profileC_id': 'youssef_assabir', 'score_ab': 0.7649849864994901, 'score_ac': 0.7716117216117215, 'score_bc': 0.8004029304029304, 'combined_score': 0.778999879504714, 'per_field_combined': {'username': {'avg_score': 0.8771184371184372, 'sources': {'a-b': {'score': 0.8967032967032967, 'weight': 0.6}, 'a-c': {'score': 0.8584615384615384, 'weight': 0.6}, 'b-c': {'score': 0.8761904761904762, 'weight': 0.6}}}, 'bio': {'avg_score': 0.3680817186832428, 'sources': {'a-b': {'score': 0.3680817186832428, 'weight': 0.2}, 'a-c': None, 'b-c': None}}, 'name': {'avg_score': 0.7249816849816849, 'sources': {'a-b': {'score': 0.7655677655677655, 'weight': 0.6}, 'a-c': {'score': 0.6847619047619047, 'weight': 0.6}, 'b-c': {'score': 0.7246153846153847, 'weight': 0.6}}}}}
 ```
 ```
-{'profileA_index': 196, 'profileA_id': 'saad-hachami-b99546142', 'profileB_index': 3062, 'profileB_id': 'saad-srhni', 'score': 0.7670959595959597, 'per_field': {'username': {'score': 0.8036363636363637, 'weight': 0.6}, 'name': {'score': 0.7305555555555555, 'weight': 0.6}}}
+{'profileA_index': 16, 'profileA_id': 'omar-bensouda', 'profileB_index': 1061, 'profileB_id': 'OmarKhouya', 'profileC_index': 1848, 'profileC_id': 'Omar_H_', 'score_ab': 0.6844853539334668, 'score_ac': 0.7237179487179487, 'score_bc': 0.7757575757575758, 'combined_score': 0.7279869594696637, 'per_field_combined': {'username': {'avg_score': 0.8526495726495726, 'sources': {'a-b': {'score': 0.8476923076923077, 'weight': 0.6}, 'a-c': {'score': 0.8435897435897436, 'weight': 0.6}, 'b-c': {'score': 0.8666666666666667, 'weight': 0.6}}}, 'bio': {'avg_score': 0.19167719781398773, 'sources': {'a-b': {'score': 0.19167719781398773, 'weight': 0.2}, 'a-c': None, 'b-c': None}}, 'name': {'avg_score': 0.658080808080808, 'sources': {'a-b': {'score': 0.6855477855477856, 'weight': 0.6}, 'a-c': {'score': 0.6038461538461538, 'weight': 0.6}, 'b-c': {'score': 0.6848484848484848, 'weight': 0.6}}}}}
 ```
 
 Examples (after):
 
 ```
-{'profileA_index': 78, 'profileA_id': 'ikrambenabdelouahab', 'profileB_index': 131, 'profileB_id': 'ikrambenabdelouahab', 'score': 0.8030166472955184, 'per_field': {'username': {'score': 1.0, 'weight': 0.6}, 'name': {'score': 0.8036363636363637, 'weight': 0.6}, 'bio': {'score': 0.4421844482421875, 'weight': 0.2}, 'repo_descriptions': {'score': 0.3390626311302185, 'weight': 0.1}}}
+{'profileA_index': 4, 'profileA_id': 'yassine-ouhadi-3a8ab9235', 'profileB_index': 3286, 'profileB_id': 'YassineRoummani2001', 'score': 0.7019904212933734, 'per_field': {'username': {'score': 0.8263157894736843, 'weight': 0.6}, 'name': {'score': 0.7523809523809524, 'weight': 0.6}, 'bio': {'score': 0.4557100534439087, 'weight': 0.2}, 'repo_descriptions': {'score': 0.146255761384964, 'weight': 0.1}}}
 ```
 ```
-{'profileA_index': 101, 'profileA_id': 'mohammed-salih-iot', 'profileB_index': 882, 'profileB_id': 'mohammedsalisu', 'score': 0.7529023864496321, 'per_field': {'username': {'score': 0.9047619047619048, 'weight': 0.6}, 'name': {'score': 0.8061904761904761, 'weight': 0.6}, 'bio': {'score': 0.36996617913246155, 'weight': 0.2}, 'repo_descriptions': {'score': 0.28788915276527405, 'weight': 0.1}}}
+{'profileA_index': 14, 'profileA_id': 'yousseffatihi', 'profileB_index': 375, 'profileB_id': 'youssefmaimouni', 'score': 0.7422210697114687, 'per_field': {'username': {'score': 0.8871794871794872, 'weight': 0.6}, 'name': {'score': 0.7014880952380952, 'weight': 0.6}, 'bio': {'score': 0.6089991927146912, 'weight': 0.2}, 'repo_descriptions': {'score': 0.3833121657371521, 'weight': 0.1}}}
 ```
 ```
-{'profileA_index': 106, 'profileA_id': 'abderrahmane-amine', 'profileB_index': 3013, 'profileB_id': 'abderrahmaneamraoui', 'score': 0.7664441774086646, 'per_field': {'username': {'score': 0.9245614035087719, 'weight': 0.6}, 'name': {'score': 0.7605555555555555, 'weight': 0.6}, 'bio': {'score': 0.5197065472602844, 'weight': 0.2}, 'repo_descriptions': {'score': 0.34654781222343445, 'weight': 0.1}}}
+{'profileA_index': 21, 'profileA_id': 'amine-bouali-bb6335101', 'profileB_index': 2254, 'profileB_id': 'AminexMouad', 'score': 0.7137554383277892, 'per_field': {'username': {'score': 0.8181818181818181, 'weight': 0.6}, 'name': {'score': 0.7484848484848485, 'weight': 0.6}, 'bio': {'score': 0.4854878783226013, 'weight': 0.2}, 'repo_descriptions': {'score': 0.33535581827163696, 'weight': 0.1}}}
 ```
 ```
-{'profileA_index': 129, 'profileA_id': 'halimbahae', 'profileB_index': 463, 'profileB_id': 'halimbahae', 'score': 0.9062226613362631, 'per_field': {'username': {'score': 1.0, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.5018070340156555, 'weight': 0.2}, 'repo_descriptions': {'score': 0.5897258520126343, 'weight': 0.1}}}
+{'profileA_index': 28, 'profileA_id': 'anouar-ben-moussa', 'profileB_index': 567, 'profileB_id': 'anouar-baoutoul', 'score': 0.7405145347819607, 'per_field': {'username': {'score': 0.8509803921568627, 'weight': 0.6}, 'name': {'score': 0.6519607843137255, 'weight': 0.6}, 'bio': {'score': 0.6966903209686279, 'weight': 0.2}, 'repo_descriptions': {'score': 0.6966903209686279, 'weight': 0.1}}}
 ```
 ```
-{'profileA_index': 136, 'profileA_id': 'ennajari-abdellah', 'profileB_index': 390, 'profileB_id': 'ennajari', 'score': 0.8514606092957889, 'per_field': {'username': {'score': 0.8941176470588236, 'weight': 0.6}, 'name': {'score': 1.0, 'weight': 0.6}, 'bio': {'score': 0.5025341510772705, 'weight': 0.2}, 'repo_descriptions': {'score': 0.4021349549293518, 'weight': 0.1}}}
+{'profileA_index': 32, 'profileA_id': 'abderrahmane-boukoutti-6a1434272', 'profileB_index': 3013, 'profileB_id': 'abderrahmaneamraoui', 'score': 0.7210084771353281, 'per_field': {'username': {'score': 0.843421052631579, 'weight': 0.6}, 'name': {'score': 0.7375757575757576, 'weight': 0.6}, 'bio': {'score': 0.4481690227985382, 'weight': 0.2}, 'repo_descriptions': {'score': 0.4328082501888275, 'weight': 0.1}}}
 ```
 
 ---
 
 ## Pair: linkedin->twitter
 
-- Before: 943/4276 (22.05%)
-- After : 966/4276 (22.59%)
-- Delta (after - before): 23
-- Mutual pairs (before): 220
-- Mutual pairs (after): 241
-- Common A ids in reverse B (before): 243
-- Common B ids in reverse A (before): 226
+- Before: 2035/4276 (47.59%)
+- After : 2104/4276 (49.2%)
+- Delta (after - before): 69
+- Mutual pairs (before): 0
+- Mutual pairs (after): 0
+- Common A ids in reverse B (before): 0
+- Common B ids in reverse A (before): 0
 
 Examples (before):
 
@@ -196,97 +166,37 @@ Examples (after):
 
 ## Pair: twitter->github
 
-- Before: 310/3353 (9.25%)
-- After : 339/3353 (10.11%)
-- Delta (after - before): 29
-- Mutual pairs (before): 259
-- Mutual pairs (after): 275
-- Common A ids in reverse B (before): 268
-- Common B ids in reverse A (before): 283
+- Before: 0/3353 (0.0%)
+- After : 0/3353 (0.0%)
+- Delta (after - before): 0
+- Mutual pairs (before): 0
+- Mutual pairs (after): 0
+- Common A ids in reverse B (before): 0
+- Common B ids in reverse A (before): 0
 
 Examples (before):
 
-```
-{'profileA_index': 3, 'profileA_id': '1337ai', 'profileB_index': 1246, 'profileB_id': '1337-Artificial-Intelligence', 'score': 0.7928571428571428, 'per_field': {'username': {'score': 0.8428571428571429, 'weight': 0.6}, 'name': {'score': 0.7428571428571429, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 6, 'profileA_id': '1ahmedDaouDi', 'profileB_index': 2939, 'profileB_id': 'ahmedDaoudi-u', 'score': 0.8215811965811964, 'per_field': {'username': {'score': 0.9209401709401709, 'weight': 0.6}, 'name': {'score': 0.7222222222222221, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 32, 'profileA_id': 'AbdelhadiBousa2', 'profileB_index': 3283, 'profileB_id': 'AbdelhadiBo', 'score': 0.8196078431372549, 'per_field': {'username': {'score': 0.9466666666666667, 'weight': 0.6}, 'name': {'score': 0.6925490196078431, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 34, 'profileA_id': 'abdelhakmahm', 'profileB_index': 3681, 'profileB_id': 'abdelhak-zaaim', 'score': 0.7882317927170868, 'per_field': {'username': {'score': 0.8895238095238096, 'weight': 0.6}, 'name': {'score': 0.6869397759103641, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 37, 'profileA_id': 'abdelilah_dourh', 'profileB_index': 1889, 'profileB_id': 'Abdelilah-IDIR', 'score': 0.8419047619047619, 'per_field': {'username': {'score': 0.9314285714285714, 'weight': 0.6}, 'name': {'score': 0.7523809523809524, 'weight': 0.6}}}
-```
 
 Examples (after):
 
-```
-{'profileA_index': 3, 'profileA_id': '1337ai', 'profileB_index': 1246, 'profileB_id': '1337-Artificial-Intelligence', 'score': 0.7928571428571428, 'per_field': {'username': {'score': 0.8428571428571429, 'weight': 0.6}, 'name': {'score': 0.7428571428571429, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 6, 'profileA_id': '1ahmedDaouDi', 'profileB_index': 2939, 'profileB_id': 'ahmedDaoudi-u', 'score': 0.8215811965811964, 'per_field': {'username': {'score': 0.9209401709401709, 'weight': 0.6}, 'name': {'score': 0.7222222222222221, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 32, 'profileA_id': 'AbdelhadiBousa2', 'profileB_index': 3283, 'profileB_id': 'AbdelhadiBo', 'score': 0.8196078431372549, 'per_field': {'username': {'score': 0.9466666666666667, 'weight': 0.6}, 'name': {'score': 0.6925490196078431, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 33, 'profileA_id': 'AbdelhadiSabani', 'profileB_index': 3283, 'profileB_id': 'AbdelhadiBo', 'score': 0.7571262367379519, 'per_field': {'username': {'score': 0.9151515151515152, 'weight': 0.6}, 'name': {'score': 0.7587885154061624, 'weight': 0.6}, 'bio': {'score': 0.27806356549263, 'weight': 0.2}}}
-```
-```
-{'profileA_index': 34, 'profileA_id': 'abdelhakmahm', 'profileB_index': 3681, 'profileB_id': 'abdelhak-zaaim', 'score': 0.7882317927170868, 'per_field': {'username': {'score': 0.8895238095238096, 'weight': 0.6}, 'name': {'score': 0.6869397759103641, 'weight': 0.6}}}
-```
 
 ---
 
 ## Pair: twitter->linkedin
 
-- Before: 266/3353 (7.93%)
-- After : 295/3353 (8.8%)
-- Delta (after - before): 29
-- Mutual pairs (before): 220
-- Mutual pairs (after): 241
-- Common A ids in reverse B (before): 226
-- Common B ids in reverse A (before): 243
+- Before: 0/3353 (0.0%)
+- After : 0/3353 (0.0%)
+- Delta (after - before): 0
+- Mutual pairs (before): 0
+- Mutual pairs (after): 0
+- Common A ids in reverse B (before): 0
+- Common B ids in reverse A (before): 0
 
 Examples (before):
 
-```
-{'profileA_index': 6, 'profileA_id': '1ahmedDaouDi', 'profileB_index': 1396, 'profileB_id': 'ahmed-daoudi-aa693a230', 'score': 0.7638888888888888, 'per_field': {'username': {'score': 0.8055555555555555, 'weight': 0.6}, 'name': {'score': 0.7222222222222221, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 34, 'profileA_id': 'abdelhakmahm', 'profileB_index': 1260, 'profileB_id': 'abdelhak-madda-47638672', 'score': 0.79417854098161, 'per_field': {'username': {'score': 0.8536231884057971, 'weight': 0.6}, 'name': {'score': 0.7347338935574229, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 37, 'profileA_id': 'abdelilah_dourh', 'profileB_index': 742, 'profileB_id': 'abdelilahdahamou', 'score': 0.8192563563887092, 'per_field': {'username': {'score': 0.9127564102564102, 'weight': 0.6}, 'name': {'score': 0.7257563025210083, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 39, 'profileA_id': 'AbdellahSyani', 'profileB_index': 4194, 'profileB_id': 'abdellah-sbai-bb8b7616b', 'score': 0.7824414715719064, 'per_field': {'username': {'score': 0.8648829431438128, 'weight': 0.6}, 'name': {'score': 0.7, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 41, 'profileA_id': 'abdelmounaimhm2', 'profileB_index': 1703, 'profileB_id': 'abdelmounaim-hmamed-891503203', 'score': 0.7957592256503327, 'per_field': {'username': {'score': 0.903448275862069, 'weight': 0.6}, 'name': {'score': 0.6880701754385965, 'weight': 0.6}}}
-```
 
 Examples (after):
 
-```
-{'profileA_index': 6, 'profileA_id': '1ahmedDaouDi', 'profileB_index': 1396, 'profileB_id': 'ahmed-daoudi-aa693a230', 'score': 0.7638888888888888, 'per_field': {'username': {'score': 0.8055555555555555, 'weight': 0.6}, 'name': {'score': 0.7222222222222221, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 34, 'profileA_id': 'abdelhakmahm', 'profileB_index': 1260, 'profileB_id': 'abdelhak-madda-47638672', 'score': 0.79417854098161, 'per_field': {'username': {'score': 0.8536231884057971, 'weight': 0.6}, 'name': {'score': 0.7347338935574229, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 37, 'profileA_id': 'abdelilah_dourh', 'profileB_index': 742, 'profileB_id': 'abdelilahdahamou', 'score': 0.8192563563887092, 'per_field': {'username': {'score': 0.9127564102564102, 'weight': 0.6}, 'name': {'score': 0.7257563025210083, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 39, 'profileA_id': 'AbdellahSyani', 'profileB_index': 4194, 'profileB_id': 'abdellah-sbai-bb8b7616b', 'score': 0.7824414715719064, 'per_field': {'username': {'score': 0.8648829431438128, 'weight': 0.6}, 'name': {'score': 0.7, 'weight': 0.6}}}
-```
-```
-{'profileA_index': 41, 'profileA_id': 'abdelmounaimhm2', 'profileB_index': 1703, 'profileB_id': 'abdelmounaim-hmamed-891503203', 'score': 0.7957592256503327, 'per_field': {'username': {'score': 0.903448275862069, 'weight': 0.6}, 'name': {'score': 0.6880701754385965, 'weight': 0.6}}}
-```
 
 ---
 
@@ -294,26 +204,26 @@ Examples (after):
 ## Mutual examples (sample)
 
 ### github->linkedin
-- examples before: [('sabri-abdelaaziz', 'sabriabdelaaziz'), ('redaDaalabi2', 'reda-daalabi-1535ab1bb'), ('bousettayounes', 'bousettayounes'), ('abdarrhmanessetaoui', 'abderrhman-settaoui-33569b305'), ('RachidToumzine', 'rachid-toumzine')]
-- examples after : [('sabri-abdelaaziz', 'sabriabdelaaziz'), ('redaDaalabi2', 'reda-daalabi-1535ab1bb'), ('bousettayounes', 'bousettayounes'), ('abdarrhmanessetaoui', 'abderrhman-settaoui-33569b305'), ('RachidToumzine', 'rachid-toumzine')]
+- examples before: []
+- examples after : []
 
 ### github->twitter
-- examples before: [('ibouroum', 'IBouroummana'), ('elkhiari', 'Elkhiarii'), ('marouaneaddou', 'marouane'), ('hamza-douaioui', 'hamzadouri'), ('khalidxdev', 'khalid_baddou')]
-- examples after : [('ibouroum', 'IBouroummana'), ('elkhiari', 'Elkhiarii'), ('marouaneaddou', 'marouane'), ('hamza-douaioui', 'hamzadouri'), ('khalidxdev', 'khalid_baddou')]
+- examples before: []
+- examples after : []
 
 ### linkedin->github
-- examples before: [('younesse-elkars', 'YounesseElkars'), ('bousettayounes', 'bousettayounes'), ('nabil-cambiaso-533b95193', 'nabilcambiaso'), ('abdellatif-hassani', 'abdellatif-hassani'), ('ismail-harik-241b371b9', 'Ismailharik')]
-- examples after : [('younesse-elkars', 'YounesseElkars'), ('ikram-choukhantri', 'ikramchoukhantri'), ('bousettayounes', 'bousettayounes'), ('nabil-cambiaso-533b95193', 'nabilcambiaso'), ('abdellatif-hassani', 'abdellatif-hassani')]
+- examples before: []
+- examples after : []
 
 ### linkedin->twitter
-- examples before: [('ali-zaynoune', 'alizaynoune'), ('mehditouil', 'mehdi_jil'), ('ismail-ben-alla-bai', 'ismail_ben_alla'), ('imadeddarraz', 'ImadEddarraz'), ('kaoutharelbakouri', 'kawtarelbakouri')]
-- examples after : [('ali-zaynoune', 'alizaynoune'), ('anouar-farroug', 'Anouar_Harry'), ('mehditouil', 'mehdi_jil'), ('ismail-ben-alla-bai', 'ismail_ben_alla'), ('imadeddarraz', 'ImadEddarraz')]
+- examples before: []
+- examples after : []
 
 ### twitter->github
-- examples before: [('yassinelahlou', 'yassinelakchouch'), ('hamzajgameri', 'HamzaJemragi'), ('saraelkarii', 'saraelfar'), ('kaoutar_laouaj', 'Kaoutarlaouaj'), ('junik1337', 'junik1337')]
-- examples after : [('yassinelahlou', 'yassinelakchouch'), ('medwf95', 'medwf'), ('hamzajgameri', 'HamzaJemragi'), ('saraelkarii', 'saraelfar'), ('kaoutar_laouaj', 'Kaoutarlaouaj')]
+- examples before: []
+- examples after : []
 
 ### twitter->linkedin
-- examples before: [('khadijanacer', 'khadija-nacerdine-859156251'), ('ADez3_', 'adez3'), ('salah_jettioui', 'salaheddine-el-jettioui'), ('safoinme', 'safoinme'), ('ahmed_kamel_ir', 'ahmed-jamali')]
-- examples after : [('khadijanacer', 'khadija-nacerdine-859156251'), ('RARHOUDANE', 'rachid-ait-rhoudane'), ('ADez3_', 'adez3'), ('salah_jettioui', 'salaheddine-el-jettioui'), ('safoinme', 'safoinme')]
+- examples before: []
+- examples after : []
 
