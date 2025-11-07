@@ -10,3 +10,4 @@ matching steps/
 *test*
 .venv*
 .env
+*/stats*

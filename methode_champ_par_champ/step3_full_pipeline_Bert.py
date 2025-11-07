@@ -1,30 +1,17 @@
-# step3_full_pipeline_ann.py
-"""
-Optimized pairwise matching pipeline for ~11K profiles.
-- Uses SBERT "all-MiniLM-L6-v2" to encode texts
-- Caches embeddings per source into emb_cache/<source>_embs.npz
-- Builds an ANN index with sklearn.NearestNeighbors (metric='cosine')
-- For each A profile: query ANN -> get top-N candidates -> apply detailed field scoring -> keep top-k
-"""
-
-import os
+# step3_full_pipeline.py
 import json
 import re
+import os
 import math
 import hashlib
 import struct
 import random
-import unicodedata
 from typing import List, Dict, Any, Optional
 import numpy as np
+# new: sentence-transformers
 from sentence_transformers import SentenceTransformer
-from sklearn.neighbors import NearestNeighbors
-import pathlib
-import time
 
-# ---------------------------
-# Config (change paths/names if needed)
-# ---------------------------
+# -------- user config (change file names if needed) ----------
 EMBED_FILES = {
     "linkedin": "linkedin_profiles_normalized.json",
     "twitter":  "twitter_data_cleaned.json",
@@ -32,41 +19,39 @@ EMBED_FILES = {
 }
 OUT_TEMPLATE = "results2/matches_{a}_{b}_mapped_top1.json"
 
+# field weights (tuneable)
 FIELD_WEIGHTS = {
     "username": 0.60,
     "name": 0.60,
-    "bio": 0.20,
-    "repo_names": 0.10,
-    "repo_descriptions": 0.10,
+    "bio": 0.20,               # headline/bio semantic
+    "repo_names": 0.1,
+    "repo_descriptions": 0.1,
     "location": 0.05,
     "_default": 0.05
 }
 
 PAIR_CONFIGS = {
-    ("linkedin", "github"): {"threshold": 0.75, "top_k": 5, "field_weights": FIELD_WEIGHTS},
-    ("linkedin", "twitter"): {"threshold": 0.75, "top_k": 3, "field_weights": FIELD_WEIGHTS},
-    ("twitter", "github"): {"threshold": 0.75, "top_k": 5, "field_weights": FIELD_WEIGHTS},
-    ("twitter", "linkedin"): {"threshold": 0.75, "top_k": 5, "field_weights": FIELD_WEIGHTS},
-    ("github", "twitter"): {"threshold": 0.75, "top_k": 4, "field_weights": FIELD_WEIGHTS},
-    ("github", "linkedin"): {"threshold": 0.75, "top_k": 4, "field_weights": FIELD_WEIGHTS},
+    ("linkedin", "github"): {"threshold": 0.7, "top_k": 5, "field_weights": FIELD_WEIGHTS},
+    ("linkedin", "twitter"): {"threshold": 0.7, "top_k": 5, "field_weights": FIELD_WEIGHTS},
+    ("github", "twitter"): {"threshold": 0.7, "top_k": 5, "field_weights": FIELD_WEIGHTS},
 }
 
 PAIR_FIELDS = {
     ("linkedin", "github"): ["username", "name", "bio", "repo_names", "repo_descriptions"],
     ("linkedin", "twitter"): ["username", "name", "bio"],
-    ("github" , "linkedin"): ["username", "name", "bio", "repo_names", "repo_descriptions"],
     ("github", "twitter"): ["username", "name", "bio"],
-    ("twitter", "github"): ["username", "name","bio"],
-    ("twitter" , "linkedin"): ["username", "name", "bio"],
 }
 
-# Model & dims
+# initialize the SBERT model once
 SBERT_MODEL = SentenceTransformer("all-MiniLM-L6-v2")
-THRESHOLD = 0.6
-TOP_K = 5
-CANON_DIM = 384  # embedding dim for deterministic fallback
 
-# Likely fields mapping
+THRESHOLD = 0.6  # final weighted score threshold to consider a match (tweak)
+TOP_K = 5         # keep top-K candidates before selecting top1 per A
+
+# canonical embedding dim used when deterministic vectors are generated.
+CANON_DIM = 384
+
+# fields present in your data (adjust if different)
 LIKELY_FIELDS = {
     "linkedin": ["profile_id", "username", "full_name", "headline", "about", "projects", "location"],
     "github":   ["user_id", "username", "name", "bio", "company", "email", "location", "repo_names", "repo_descriptions"],
@@ -74,25 +59,26 @@ LIKELY_FIELDS = {
 }
 
 # ---------------------------
-# Utilities: IO + normalization + timing
+# Utilities: IO + text normalization
 # ---------------------------
-_non_alnum = re.compile(r"[^0-9a-z ]+")
-
 def load_json(path: str) -> List[Dict[str, Any]]:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 def save_json(obj: Any, path: str):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=2)
+
+_non_alnum = re.compile(r"[^0-9a-z ]+")
 
 def normalize_text(s: Optional[str]) -> str:
     if s is None:
         return ""
-    s = str(s).strip().lower()
-    # remove accents
+    s = str(s)
+    s = s.strip().lower()
+    # remove accents using a simple transliteration (keep ascii only)
     try:
+        import unicodedata
         s = "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
     except Exception:
         pass
@@ -101,13 +87,29 @@ def normalize_text(s: Optional[str]) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return s
 
-def now_s():
-    return f"{time.perf_counter():.3f}"
+def batch_encode_texts(texts: List[str], batch_size: int = 64) -> List[Optional[np.ndarray]]:
+    """
+    Encodes a list of texts with SBERT in batches.
+    Returns list of numpy arrays or None for empty inputs.
+    """
+    out = []
+    # map index -> text so we can return None for empty strings
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i+batch_size]
+        # prepare inputs: keep original empties as "", SBERT will produce something for "", but we prefer None
+        encoded = SBERT_MODEL.encode(batch, show_progress_bar=False, convert_to_numpy=True)
+        for t, arr in zip(batch, encoded):
+            if not t or str(t).strip() == "":
+                out.append(None)
+            else:
+                out.append(np.array(arr, dtype=np.float32))
+    return out
 
 # ---------------------------
-# String similarity utilities
+# String similarity functions
 # ---------------------------
 def levenshtein(a: str, b: str) -> int:
+    # classic Levenshtein (iterative, memory-optimized)
     if a == b:
         return 0
     if not a:
@@ -131,6 +133,7 @@ def normalized_levenshtein(a: str, b: str) -> float:
     return 1.0 - (dist / denom) if denom > 0 else 0.0
 
 def jaro_winkler(s1: str, s2: str, p: float = 0.1) -> float:
+    # pure python Jaro-Winkler implementation
     if not s1 and not s2:
         return 1.0
     if not s1 or not s2:
@@ -141,6 +144,7 @@ def jaro_winkler(s1: str, s2: str, p: float = 0.1) -> float:
     s2_matches = [False]*s2_len
     matches = 0
     transpositions = 0
+    # find matches
     for i in range(s1_len):
         start = max(0, i - match_distance)
         end = min(i + match_distance + 1, s2_len)
@@ -152,6 +156,7 @@ def jaro_winkler(s1: str, s2: str, p: float = 0.1) -> float:
                 break
     if matches == 0:
         return 0.0
+    # count transpositions
     k = 0
     for i in range(s1_len):
         if s1_matches[i]:
@@ -162,6 +167,8 @@ def jaro_winkler(s1: str, s2: str, p: float = 0.1) -> float:
             k += 1
     transpositions /= 2
     jaro = ((matches / s1_len) + (matches / s2_len) + ((matches - transpositions) / matches)) / 3.0
+    # Jaro-Winkler
+    # common prefix up to 4 chars
     prefix = 0
     for i in range(min(4, s1_len, s2_len)):
         if s1[i] == s2[i]:
@@ -179,7 +186,9 @@ def cosine_sim(a: Optional[np.ndarray], b: Optional[np.ndarray]) -> float:
         return 0.0
     a = np.asarray(a, dtype=np.float32)
     b = np.asarray(b, dtype=np.float32)
-    if a.size == 0 or b.size == 0 or a.shape != b.shape:
+    if a.size == 0 or b.size == 0:
+        return 0.0
+    if a.shape != b.shape:
         return 0.0
     denom = (np.linalg.norm(a) * np.linalg.norm(b))
     if denom == 0:
@@ -189,6 +198,7 @@ def cosine_sim(a: Optional[np.ndarray], b: Optional[np.ndarray]) -> float:
 def deterministic_hash_vector(s: str, dim: int = CANON_DIM, seedfold: int = 0) -> np.ndarray:
     if s is None:
         s = ""
+    # stable seed from sha256
     h = hashlib.sha256(s.encode("utf-8") + struct.pack("I", seedfold)).digest()
     seed = int.from_bytes(h[:8], "big")
     rnd = random.Random(seed)
@@ -197,11 +207,17 @@ def deterministic_hash_vector(s: str, dim: int = CANON_DIM, seedfold: int = 0) -
     return vec / (norm + 1e-12) if norm > 0 else vec
 
 def extract_embedding_from_field(value: Any) -> Optional[np.ndarray]:
+    """
+    The raw JSON may contain embedding lists or lists of lists.
+    This function tries to detect and convert numeric lists into numpy arrays.
+    """
     if value is None:
         return None
+    # if value is already numeric list
     if isinstance(value, list) and value and all(isinstance(x, (int, float)) for x in value):
         return np.array(value, dtype=np.float32)
-    if isinstance(value, list) and value and isinstance(value[0], list):
+    # if value is a list of numeric lists, compute mean
+    if isinstance(value, list) and value and isinstance(value[0], list) and all(isinstance(el, (list, tuple, np.ndarray)) for el in value):
         arrs = []
         for el in value:
             if el is None:
@@ -210,32 +226,19 @@ def extract_embedding_from_field(value: Any) -> Optional[np.ndarray]:
                 arrs.append(np.array(el, dtype=np.float32))
         if arrs:
             return np.vstack(arrs).mean(axis=0)
+    # not an embedding
     return None
 
 # ---------------------------
-# Efficient batch encoding (encode only non-empty texts)
-# ---------------------------
-def batch_encode_texts_efficient(texts: List[str], batch_size: int = 64) -> List[Optional[np.ndarray]]:
-    out = [None] * len(texts)
-    idxs = [i for i, t in enumerate(texts) if t and str(t).strip() != ""]
-    if not idxs:
-        return out
-    non_empty_texts = [texts[i] for i in idxs]
-    for i in range(0, len(non_empty_texts), batch_size):
-        batch = non_empty_texts[i:i+batch_size]
-        encoded = SBERT_MODEL.encode(batch, show_progress_bar=False, convert_to_numpy=True)
-        for j, arr in enumerate(encoded):
-            out[idxs[i+j]] = np.array(arr, dtype=np.float32)
-    return out
-
-# ---------------------------
-# Field-level similarity
+# Field-level similarity computation
 # ---------------------------
 def username_similarity(a_raw: Dict[str,Any], b_raw: Dict[str,Any]) -> float:
+    # try canonical fields
     a_user = (a_raw.get("profile_id") or a_raw.get("username") or a_raw.get("user_id") or a_raw.get("Username"))
     b_user = (b_raw.get("profile_id") or b_raw.get("username") or b_raw.get("user_id") or b_raw.get("Username"))
     if a_user is None or b_user is None:
         return 0.0
+    # both might be lists -> join
     def to_str(u):
         if isinstance(u, list):
             return " ".join(map(str,u))
@@ -246,6 +249,7 @@ def username_similarity(a_raw: Dict[str,Any], b_raw: Dict[str,Any]) -> float:
         return 0.0
     if a_s == b_s:
         return 1.0
+    # strong: jaro_winkler on normalized username
     jw = jaro_winkler(a_s, b_s)
     return jw
 
@@ -262,8 +266,10 @@ def name_similarity(a_raw: Dict[str,Any], b_raw: Dict[str,Any]) -> float:
     b_s = normalize_text(to_str(b_name))
     if not a_s or not b_s:
         return 0.0
+    # try Jaro-Winkler and normalized Levenshtein and average them
     jw = jaro_winkler(a_s, b_s)
     lv = normalized_levenshtein(a_s, b_s)
+    # also account for token overlap (same family name)
     a_tokens = set(a_s.split())
     b_tokens = set(b_s.split())
     jacc = len(a_tokens & b_tokens) / max(1, len(a_tokens | b_tokens))
@@ -286,23 +292,33 @@ def location_similarity(a_raw: Dict[str,Any], b_raw: Dict[str,Any]) -> float:
     return jw
 
 def semantic_similarity_field(a_emb: Optional[np.ndarray], b_emb: Optional[np.ndarray]) -> float:
+    # safe cosine - if dims mismatch returns 0
     return cosine_sim(a_emb, b_emb)
 
 # ---------------------------
-# Prepare profiles: normalize and compute per-field embeddings
+# Build canonical per-profile representation (normalized strings + embeddings)
 # ---------------------------
 def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canonical_dim: int) -> List[Dict[str,Any]]:
+    """
+    Builds normalized items and computes embeddings using:
+      - numeric embeddings if present in the raw JSON, else
+      - SBERT (all-MiniLM-L6-v2) for textual fields, else
+      - deterministic_hash_vector fallback.
+    """
     prepared = []
+    # We'll first build skeleton items and collect texts to batch-encode
     bio_texts = []
     repo_names_texts = []
     repo_desc_texts = []
     projects_texts = []
     name_texts = []
+    # For mapping back
     idx_to_item = []
 
     for p in raw_profiles:
         item = {"__orig__": p, "source": source_name}
         item["norm"] = {}
+
         # username
         username_candidates = (p.get("profile_id") or p.get("username") or p.get("user_id") or p.get("Username"))
         if username_candidates is not None:
@@ -311,6 +327,7 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
             item["norm"]["username"] = normalize_text(str(username_candidates))
         else:
             item["norm"]["username"] = ""
+
         # name
         name_val = p.get("full_name") or p.get("fullName") or p.get("name")
         if name_val is not None:
@@ -319,6 +336,7 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
             item["norm"]["name"] = normalize_text(str(name_val))
         else:
             item["norm"]["name"] = ""
+
         # location
         loc = p.get("location")
         if loc is not None:
@@ -327,7 +345,8 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
             item["norm"]["location"] = normalize_text(str(loc))
         else:
             item["norm"]["location"] = ""
-        # bio_text: combine headline/about/bio/description/company/repo_descriptions
+
+        # bio text concatenation
         bio_fields = []
         for k in ("headline", "about", "bio", "description"):
             v = p.get(k)
@@ -342,7 +361,9 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
             joined = " ".join(str(x) for x in p.get("repo_descriptions") if isinstance(x, (str, int, float)))
             if joined:
                 bio_fields.append(joined)
+
         item["norm"]["bio_text"] = normalize_text(" ".join(bio_fields)) if bio_fields else ""
+
         # projects
         if p.get("projects") and isinstance(p.get("projects"), list):
             proj_texts = []
@@ -369,51 +390,63 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
                 item["norm"]["projects_text"] = ""
         else:
             item["norm"]["projects_text"] = ""
-        # initialize emb dict
+
+        # initialize emb dict (placeholders)
         item["emb"] = {"global": None, "bio": None, "repo_names": None, "repo_descriptions": None, "projects": None, "name": None}
-        # try to detect numeric embeddings in raw
+
+        # collect texts for later batch encoding (but use existing numeric embeddings if available)
+        # check for existing numeric embeddings for bio/repo fields:
         if "bio" in p:
             existing = extract_embedding_from_field(p.get("bio"))
             if existing is not None:
                 item["emb"]["bio"] = existing
+
         if "repo_descriptions" in p:
             existing = extract_embedding_from_field(p.get("repo_descriptions"))
             if existing is not None:
                 item["emb"]["repo_descriptions"] = existing
-        # repo_names joined
+
+        # repo_names as joined string
         rn = p.get("repo_names")
         if rn:
             if isinstance(rn, list):
                 joined = " ".join(str(x) for x in rn if isinstance(x, (str, int, float)))
             else:
                 joined = str(rn)
+            # we will encode via SBERT unless an embedding is present in raw
             item["norm"].setdefault("repo_names_text", normalize_text(joined) if joined else "")
         else:
             item["norm"].setdefault("repo_names_text", "")
-        # prepare batching lists
-        bio_texts.append(item["norm"]["bio_text"] or "")
+
+        # prepare batching lists (only if embedding not already present)
+        bio_texts.append(item["norm"]["bio_text"] if item["norm"]["bio_text"] else "")
         repo_names_texts.append(item["norm"].get("repo_names_text","") or "")
-        repo_desc_texts.append(item["norm"]["bio_text"] or "")
+        repo_desc_texts.append(item["norm"]["bio_text"] if item["norm"]["bio_text"] else "")  # fallback: include bio if repo desc not present
         projects_texts.append(item["norm"].get("projects_text","") or "")
         name_texts.append(item["norm"].get("name","") or "")
 
         idx_to_item.append(item)
         prepared.append(item)
 
-    # Batch encode (efficient)
-    bio_embs = batch_encode_texts_efficient(bio_texts, batch_size=64)
-    repo_names_embs = batch_encode_texts_efficient(repo_names_texts, batch_size=64)
-    projects_embs = batch_encode_texts_efficient(projects_texts, batch_size=64)
-    name_embs = batch_encode_texts_efficient(name_texts, batch_size=64)
+    # Batch encode lists with SBERT where embeddings are missing
+    # Note: we keep the same order as prepared list
+    bio_embs = batch_encode_texts(bio_texts, batch_size=64)
+    repo_names_embs = batch_encode_texts(repo_names_texts, batch_size=64)
+    projects_embs = batch_encode_texts(projects_texts, batch_size=64)
+    name_embs = batch_encode_texts(name_texts, batch_size=64)
 
     for idx, item in enumerate(prepared):
         p = item["__orig__"]
+        # bio
         if item["emb"].get("bio") is None:
             emb = bio_embs[idx]
             if emb is not None:
                 item["emb"]["bio"] = emb
             else:
+                # fallback deterministic for empty text
                 item["emb"]["bio"] = deterministic_hash_vector(item["norm"].get("bio_text",""), dim=canonical_dim) if item["norm"].get("bio_text") else None
+
+        # repo_names
         if item["emb"].get("repo_names") is None:
             emb = repo_names_embs[idx]
             if emb is not None and emb.size>0:
@@ -421,13 +454,18 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
             else:
                 rn_text = item["norm"].get("repo_names_text","")
                 item["emb"]["repo_names"] = deterministic_hash_vector(rn_text, dim=canonical_dim) if rn_text else None
+
+        # repo_descriptions - if we didn't find numeric in raw, try using bio_text derived embedding (best-effort)
         if item["emb"].get("repo_descriptions") is None:
+            # use repo_names emb or bio emb as proxy if repo descriptions missing
             if item["emb"].get("repo_names") is not None:
                 item["emb"]["repo_descriptions"] = item["emb"].get("repo_names")
             elif item["emb"].get("bio") is not None:
                 item["emb"]["repo_descriptions"] = item["emb"].get("bio")
             else:
                 item["emb"]["repo_descriptions"] = None
+
+        # projects
         if item["emb"].get("projects") is None:
             emb = projects_embs[idx]
             if emb is not None:
@@ -435,6 +473,8 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
             else:
                 proj_text = item["norm"].get("projects_text","")
                 item["emb"]["projects"] = deterministic_hash_vector(proj_text, dim=canonical_dim) if proj_text else None
+
+        # name
         if item["emb"].get("name") is None:
             emb = name_embs[idx]
             if emb is not None:
@@ -446,211 +486,136 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
     return prepared
 
 # ---------------------------
-# Compute global embedding (weighted mean of available fields)
-# ---------------------------
-def compute_global_embedding(item: Dict[str,Any], field_weights: Dict[str,float], dim: int = CANON_DIM):
-    keys = ["name", "username", "bio", "repo_names", "repo_descriptions", "projects"]
-    vecs = []
-    ws = []
-    for k in keys:
-        emb = item["emb"].get(k)
-        if emb is None:
-            continue
-        w = field_weights.get(k, field_weights.get("_default", 0.05))
-        vecs.append(emb.astype(np.float32))
-        ws.append(w)
-    if not vecs:
-        return None
-    mat = np.vstack(vecs)
-    ws = np.array(ws, dtype=np.float32)[:, None]
-    weighted = (mat * ws).sum(axis=0) / (ws.sum() + 1e-12)
-    norm = np.linalg.norm(weighted)
-    return weighted / (norm + 1e-12) if norm > 0 else weighted
-
-# ---------------------------
-# Embedding cache save/load
-# ---------------------------
-def embeddings_cache_path(source_name: str):
-    p = pathlib.Path("emb_cache")
-    p.mkdir(exist_ok=True)
-    return p / f"{source_name}_embs.npz"
-
-def save_embeddings_cache(prepared: List[Dict[str,Any]], source_name: str, dim: int = CANON_DIM):
-    arrs = {}
-    keys = ("global","bio","repo_names","repo_descriptions","projects","name")
-    mats = {k: [] for k in keys}
-    for p in prepared:
-        for k in keys:
-            e = p["emb"].get(k)
-            if e is None:
-                mats[k].append(np.zeros((dim,), dtype=np.float32))
-            else:
-                mats[k].append(np.asarray(e, dtype=np.float32))
-    for k in keys:
-        arrs[k] = np.vstack(mats[k])
-    np.savez_compressed(embeddings_cache_path(source_name), **arrs)
-
-def load_embeddings_cache_if_exists(prepared: List[Dict[str,Any]], source_name: str):
-    p = embeddings_cache_path(source_name)
-    if not p.exists():
-        return False
-    data = np.load(p)
-    keys = ("global","bio","repo_names","repo_descriptions","projects","name")
-    for i, item in enumerate(prepared):
-        for k in keys:
-            arr = data[k][i]
-            item["emb"][k] = arr.astype(np.float32)
-    return True
-
-# ---------------------------
-# Scoring pair (field-wise hybrid)
+# Per-pair scoring using the recommended hybrid approach
 # ---------------------------
 def score_pair(a_prep: Dict[str,Any], b_prep: Dict[str,Any], field_weights: Dict[str,float], fields_to_use: Optional[List[str]] = None) -> Dict[str,Any]:
     per_field = {}
     total_weight = 0.0
     weighted_sum = 0.0
+
     if fields_to_use is None:
         fields_to_use = ["username", "name", "bio", "repo_names", "repo_descriptions", "location"]
+
     for field in fields_to_use:
         a_emb = a_prep["emb"].get(field)
         b_emb = b_prep["emb"].get(field)
         if field in ("bio","projects","repo_names","repo_descriptions") and (a_emb is None or b_emb is None):
-            s = 0.0
-        else:
-            if field == "username":
-                s = username_similarity(a_prep["__orig__"], b_prep["__orig__"])
-            elif field == "name":
-                s = name_similarity(a_prep["__orig__"], b_prep["__orig__"])
-            elif field == "bio":
-                s = semantic_similarity_field(a_prep["emb"].get("bio"), b_prep["emb"].get("bio"))
-            elif field == "projects":
-                s = semantic_similarity_field(a_prep["emb"].get("projects"), b_prep["emb"].get("projects"))
-            elif field == "repo_names":
-                s = semantic_similarity_field(a_prep["emb"].get("repo_names"), b_prep["emb"].get("repo_names"))
-            elif field == "repo_descriptions":
-                s = semantic_similarity_field(a_prep["emb"].get("repo_descriptions"), b_prep["emb"].get("repo_descriptions"))
-            elif field == "location":
-                s = location_similarity(a_prep["__orig__"], b_prep["__orig__"])
-            else:
-                s = 0.0
+            continue
+
         w = field_weights.get(field, field_weights.get("_default", 0.0))
+        if field == "username":
+            s = username_similarity(a_prep["__orig__"], b_prep["__orig__"])
+        elif field == "name":
+            s = name_similarity(a_prep["__orig__"], b_prep["__orig__"])
+        elif field == "bio":
+            s = semantic_similarity_field(a_prep["emb"].get("bio"), b_prep["emb"].get("bio"))
+        elif field == "projects":
+            s = semantic_similarity_field(a_prep["emb"].get("projects"), b_prep["emb"].get("projects"))
+        elif field == "repo_names":
+            s = semantic_similarity_field(a_prep["emb"].get("repo_names"), b_prep["emb"].get("repo_names"))
+        elif field == "repo_descriptions":
+            s = semantic_similarity_field(a_prep["emb"].get("repo_descriptions"), b_prep["emb"].get("repo_descriptions"))
+        elif field == "location":
+            s = location_similarity(a_prep["__orig__"], b_prep["__orig__"])
+        else:
+            s = 0.0
         per_field[field] = {"score": s, "weight": w}
         weighted_sum += s * w
         total_weight += w
+
     final_score = float(weighted_sum / total_weight) if total_weight > 0 else 0.0
     return {"score": final_score, "per_field": per_field}
 
 # ---------------------------
-# ANN index building & query (sklearn)
+# Blocking / Candidate selection - simple but effective
 # ---------------------------
-def build_sklearn_index_from_prepared(B_prepared, dim):
-    rows = []
-    for p in B_prepared:
-        g = p["emb"].get("global")
-        if g is None:
-            g = p["emb"].get("bio") or p["emb"].get("name")
-            if g is None:
-                g = np.zeros((dim,), dtype=np.float32)
-        rows.append(np.asarray(g, dtype=np.float32))
-    B_matrix = np.vstack(rows)
-    nn = NearestNeighbors(metric="cosine", algorithm="auto", n_jobs=-1)
-    nn.fit(B_matrix)
-    return nn, B_matrix
-
-def batch_query_candidates(nn, B_matrix, A_globals, ann_k=50, batch_size=512):
-    n = A_globals.shape[0]
-    results = [None] * n
-    for i in range(0, n, batch_size):
-        stop = min(n, i + batch_size)
-        batch = A_globals[i:stop].astype(np.float32)
-        dists, idxs = nn.kneighbors(batch, n_neighbors=min(ann_k, B_matrix.shape[0]), return_distance=True)
-        for j in range(batch.shape[0]):
-            ids = idxs[j].tolist()
-            sims = (1.0 - dists[j]).tolist()
-            results[i + j] = list(zip(ids, sims))
-    return results
+def build_index(prepared: List[Dict[str,Any]], key_field: str = "username") -> Dict[str, List[int]]:
+    """
+    Build a dict mapping a blocking key -> list of indices.
+    Here we use first two characters of username or name token as a block key.
+    """
+    idx = {}
+    for i, p in enumerate(prepared):
+        key = ""
+        if p["norm"].get(key_field):
+            key = p["norm"][key_field][:2]  # first two chars
+        else:
+            # fallback to name
+            name = p["norm"].get("name","")
+            key = name[:2] if name else ""
+        idx.setdefault(key, []).append(i)
+    return idx
 
 # ---------------------------
-# Main pairwise function using ANN + reranking (with corrected global assignment)
+# Main pairwise function
 # ---------------------------
-def pairwise_match_ann(a_name: str, b_name: str,
-                       selected_fields: Optional[List[str]] = None,
-                       threshold: float = THRESHOLD,
-                       top_k: int = TOP_K,
-                       field_weights: Dict[str,float] = FIELD_WEIGHTS,
-                       ann_k: int = 50,
-                       use_cache: bool = True):
-    t0 = time.perf_counter()
-    rawA = load_json(EMBED_FILES[a_name])
-    rawB = load_json(EMBED_FILES[b_name])
-    print(f"[info] loaded {len(rawA)} A, {len(rawB)} B")
+def pairwise_match(a_name: str, b_name: str,
+                   selected_fields: Optional[List[str]] = None,
+                   threshold: float = THRESHOLD,
+                   top_k: int = TOP_K,
+                   field_weights: Dict[str,float] = FIELD_WEIGHTS,
+                   show_diag: bool = True):
+    a_path = EMBED_FILES[a_name]
+    b_path = EMBED_FILES[b_name]
+    rawA = load_json(a_path)
+    rawB = load_json(b_path)
+    if show_diag:
+        print(f"Loaded {len(rawA)} from {a_name}, {len(rawB)} from {b_name}")
+        print("sample raw keys A:", {k: type(v).__name__ for k,v in (rawA[0].items() if rawA else [])})
+        if rawB:
+            print("sample raw keys B:", {k: type(v).__name__ for k,v in rawB[0].items()})
+    if selected_fields is None:
+        selected_fields = PAIR_FIELDS.get((a_name, b_name), None)
 
-    # detect embedding dim if present in rawB
+    # quick attempt to detect canonical dim from any numeric embedding present in B
     detected_dim = None
     for p in rawB:
         for k,v in p.items():
             emb = extract_embedding_from_field(v)
             if emb is not None:
-                detected_dim = int(emb.shape[0])
+                detected_dim = emb.shape[0]
                 break
         if detected_dim:
             break
     canonical_dim = detected_dim if detected_dim else CANON_DIM
-    print(f"[info] canonical_dim = {canonical_dim}")
+    if show_diag:
+        print(f"[diag] canonical embedding dim = {canonical_dim}")
 
     A = prepare_profiles(rawA, a_name, canonical_dim)
     B = prepare_profiles(rawB, b_name, canonical_dim)
-    print(f"[info] prepared A={len(A)} B={len(B)}")
+    if show_diag and A:
+        print(f"[diag] example prepared A fields: {list(A[0]['norm'].keys())}, emb keys: {list(A[0]['emb'].keys())}")
+    if show_diag and B:
+        print(f"[diag] example prepared B fields: {list(B[0]['norm'].keys())}, emb keys: {list(B[0]['emb'].keys())}")
 
-    # compute or load global embeddings (corrected assignment: avoid 'or' with ndarray)
-    if use_cache and load_embeddings_cache_if_exists(A, a_name):
-        print(f"[cache] loaded embeddings cache for {a_name}")
-    else:
-        for p in A:
-            if p["emb"].get("global") is None:
-                g = compute_global_embedding(p, field_weights, dim=canonical_dim)
-                if g is None:
-                    p["emb"]["global"] = np.zeros((canonical_dim,), dtype=np.float32)
-                else:
-                    p["emb"]["global"] = np.asarray(g, dtype=np.float32)
-        save_embeddings_cache(A, a_name, dim=canonical_dim)
-        print(f"[cache] saved embeddings for {a_name}")
-
-    if use_cache and load_embeddings_cache_if_exists(B, b_name):
-        print(f"[cache] loaded embeddings cache for {b_name}")
-    else:
-        for p in B:
-            if p["emb"].get("global") is None:
-                g = compute_global_embedding(p, field_weights, dim=canonical_dim)
-                if g is None:
-                    p["emb"]["global"] = np.zeros((canonical_dim,), dtype=np.float32)
-                else:
-                    p["emb"]["global"] = np.asarray(g, dtype=np.float32)
-        save_embeddings_cache(B, b_name, dim=canonical_dim)
-        print(f"[cache] saved embeddings for {b_name}")
-
-    # build index
-    nn, B_matrix = build_sklearn_index_from_prepared(B, canonical_dim)
-    print(f"[info] ANN index built; B_matrix shape = {B_matrix.shape}")
-
-    # build A globals matrix
-    A_globals = np.vstack([p["emb"]["global"] for p in A]).astype(np.float32)
-
-    # batch query candidates
-    candidate_lists = batch_query_candidates(nn, B_matrix, A_globals, ann_k=ann_k, batch_size=512)
+    # build blocking index on B
+    b_index = build_index(B, key_field="username")
 
     raw_matches = []
-    for i, cand_list in enumerate(candidate_lists):
-        if not cand_list:
+    for i, a in enumerate(A):
+        # skip if no useful content
+        if not (a["norm"].get("username") or a["norm"].get("name") or a["norm"].get("bio_text")):
             continue
-        cand_idxs = [c[0] for c in cand_list]
-        a_item = A[i]
+
+        block_key = (a["norm"].get("username") or a["norm"].get("name") or "")[:2]
+        candidates_idx = set()
+        if block_key in b_index:
+            candidates_idx.update(b_index[block_key])
+        # also attempt more relaxed blocks: first char or empty-key
+        if block_key and block_key[:1] in b_index:
+            candidates_idx.update(b_index[block_key[:1]])
+        # if still empty, fallback to full scan (but we try to avoid it)
+        if not candidates_idx:
+            candidates_idx = set(range(len(B)))
+
         scored = []
-        for j in cand_idxs:
-            b_item = B[j]
-            sc = score_pair(a_item, b_item, field_weights, fields_to_use=selected_fields)
+        for j in candidates_idx:
+            b = B[j]
+            sc = score_pair(a, b, field_weights, fields_to_use=selected_fields)
             if sc["score"] >= threshold:
                 scored.append((sc["score"], j, sc))
+
+        # keep top_k
         scored.sort(key=lambda x: x[0], reverse=True)
         for score, j, sc in scored[:top_k]:
             raw_matches.append({
@@ -662,7 +627,7 @@ def pairwise_match_ann(a_name: str, b_name: str,
                 "per_field": sc["per_field"]
             })
 
-    # keep only top match per A (dedupe)
+    # keep only top match per A
     best_per_A = {}
     for m in raw_matches:
         ida = m["profileA_id"] if m["profileA_id"] is not None else m["profileA_index"]
@@ -670,30 +635,31 @@ def pairwise_match_ann(a_name: str, b_name: str,
             best_per_A[ida] = m
     final_matches = list(best_per_A.values())
 
+    if show_diag:
+        print(f"[diag] matches considered: {len(raw_matches)}; final top1: {len(final_matches)}")
+
     out = OUT_TEMPLATE.format(a=a_name, b=b_name)
     save_json(final_matches, out)
-    t1 = time.perf_counter()
-    print(f"[done] saved {len(final_matches)} matches to {out} (time {t1-t0:.2f}s)")
+    if show_diag:
+        print(f"Saved {len(final_matches)} matches to {out}")
     return final_matches
 
+
 # ---------------------------
-# Script entrypoint
+# run as script
 # ---------------------------
 if __name__ == "__main__":
     pairs_to_match = [
         ("linkedin", "github"),
         ("linkedin", "twitter"),
         ("github", "twitter"),
-        ("github", "linkedin"),
-        ("twitter", "github"),
-        ("twitter", "linkedin"),
     ]
 
     for a, b in pairs_to_match:
-        cfg = PAIR_CONFIGS.get((a,b), {})
-        threshold = cfg.get("threshold", THRESHOLD)
-        top_k = cfg.get("top_k", TOP_K)
-        field_weights = cfg.get("field_weights", FIELD_WEIGHTS)
-        selected_fields = PAIR_FIELDS.get((a,b), None)
-        print(f"\n=== Matching {a} -> {b} (threshold={threshold}, top_k={top_k}) ===")
-        pairwise_match_ann(a, b, selected_fields=selected_fields, threshold=threshold, top_k=top_k, field_weights=field_weights, ann_k=50)
+        config = PAIR_CONFIGS.get((a,b), {})
+        threshold = config.get("threshold", THRESHOLD)
+        top_k = config.get("top_k", TOP_K)
+        field_weights = config.get("field_weights", FIELD_WEIGHTS)
+        fields_to_use = PAIR_FIELDS.get((a,b), None)
+
+        pairwise_match(a, b, threshold=threshold, top_k=top_k, field_weights=field_weights, selected_fields=fields_to_use)

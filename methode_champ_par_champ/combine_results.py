@@ -2,8 +2,8 @@ import json
 import os
 from collections import defaultdict, Counter
 
-RESULTS_DIR = "results2"
-OUT_FILE = "results2/consolidated_matches.json"
+RESULTS_DIR = "results"
+OUT_FILE = "stats/consolidated_matches.json"
 
 # ajuster vos fichiers originaux pour compter les profils
 EMBED_FILES = {

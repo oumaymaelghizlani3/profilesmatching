@@ -292,9 +292,6 @@ def run_all_pairs(pairs: Optional[List[Tuple[str,str]]] = None):
             ("linkedin","github"),
             ("linkedin","twitter"),
             ("github","twitter"),
-            ("github","linkedin"),
-            ("twitter","github"),
-            ("twitter","linkedin")
         ]
     summary = {}
     for a,b in pairs:

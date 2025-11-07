@@ -1,8 +1,7 @@
-# step3_full_pipeline.py
+# step3_three_way_only.py
 import json
 import re
 import os
-import math
 import hashlib
 import struct
 import random
@@ -15,50 +14,33 @@ EMBED_FILES = {
     "twitter":  "twitter_data_cleaned.json",
     "github":   "github_cleaned.json"
 }
-OUT_TEMPLATE = "results/matches_{a}_{b}_mapped_top1.json"
+THREE_OUT_TEMPLATE = "matches_{a}_{b}_{c}_top_cosine.json"
+
+# ensure results dir exists
+os.makedirs("results", exist_ok=True)
 
 # field weights (tuneable)
 FIELD_WEIGHTS = {
-    "username": 0.60,
-    "name": 0.60,
-    "bio": 0.20,               # headline/bio semantic
+    "username": 0.30,
+    "name": 0.25,
+    "bio": 0.15,               # headline/bio semantic
     "repo_names": 0.1,
     "repo_descriptions": 0.1,
     "location": 0.05,
     "_default": 0.05
 }
 
-PAIR_CONFIGS = {
-    ("linkedin", "github"): {"threshold": 0.65, "top_k": 5, "field_weights": FIELD_WEIGHTS},
-    ("linkedin", "twitter"): {"threshold": 0.55, "top_k": 3, "field_weights": FIELD_WEIGHTS},
-    ("twitter", "github"): {"threshold": 0.5, "top_k": 5, "field_weights": FIELD_WEIGHTS},
-    ("twitter", "linkedin"): {"threshold": 0.5, "top_k": 5, "field_weights": FIELD_WEIGHTS},
-    ("github", "twitter"): {"threshold": 0.55, "top_k": 4, "field_weights": FIELD_WEIGHTS},
-    ("github", "linkedin"): {"threshold": 0.65, "top_k": 4, "field_weights": FIELD_WEIGHTS},
-}
-
 PAIR_FIELDS = {
     ("linkedin", "github"): ["username", "name", "bio", "repo_names", "repo_descriptions"],
     ("linkedin", "twitter"): ["username", "name", "bio"],
-    ("github" , "linkedin"): ["username", "name", "bio", "repo_names", "repo_descriptions"],
     ("github", "twitter"): ["username", "name", "bio"],
-    ("twitter", "github"): ["username", "name","bio"],
-    ("twitter" , "linkedin"): ["username", "name", "bio"],
 }
-
 
 THRESHOLD = 0.6  # final weighted score threshold to consider a match (tweak)
 TOP_K = 5         # keep top-K candidates before selecting top1 per A
 
 # canonical embedding dim used when deterministic vectors are generated.
 CANON_DIM = 384
-
-# fields present in your data (adjust if different)
-LIKELY_FIELDS = {
-    "linkedin": ["profile_id", "username", "full_name", "headline", "about", "projects", "location"],
-    "github":   ["user_id", "username", "name", "bio", "company", "email", "location", "repo_names", "repo_descriptions"],
-    "twitter":  ["Username", "username", "name", "bio", "location"]
-}
 
 # ---------------------------
 # Utilities: IO + text normalization
@@ -78,7 +60,6 @@ def normalize_text(s: Optional[str]) -> str:
         return ""
     s = str(s)
     s = s.strip().lower()
-    # remove accents using a simple transliteration (keep ascii only)
     try:
         import unicodedata
         s = "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
@@ -93,7 +74,6 @@ def normalize_text(s: Optional[str]) -> str:
 # String similarity functions
 # ---------------------------
 def levenshtein(a: str, b: str) -> int:
-    # classic Levenshtein (iterative, memory-optimized)
     if a == b:
         return 0
     if not a:
@@ -117,7 +97,6 @@ def normalized_levenshtein(a: str, b: str) -> float:
     return 1.0 - (dist / denom) if denom > 0 else 0.0
 
 def jaro_winkler(s1: str, s2: str, p: float = 0.1) -> float:
-    # pure python Jaro-Winkler implementation
     if not s1 and not s2:
         return 1.0
     if not s1 or not s2:
@@ -128,7 +107,6 @@ def jaro_winkler(s1: str, s2: str, p: float = 0.1) -> float:
     s2_matches = [False]*s2_len
     matches = 0
     transpositions = 0
-    # find matches
     for i in range(s1_len):
         start = max(0, i - match_distance)
         end = min(i + match_distance + 1, s2_len)
@@ -140,7 +118,6 @@ def jaro_winkler(s1: str, s2: str, p: float = 0.1) -> float:
                 break
     if matches == 0:
         return 0.0
-    # count transpositions
     k = 0
     for i in range(s1_len):
         if s1_matches[i]:
@@ -151,8 +128,6 @@ def jaro_winkler(s1: str, s2: str, p: float = 0.1) -> float:
             k += 1
     transpositions /= 2
     jaro = ((matches / s1_len) + (matches / s2_len) + ((matches - transpositions) / matches)) / 3.0
-    # Jaro-Winkler
-    # common prefix up to 4 chars
     prefix = 0
     for i in range(min(4, s1_len, s2_len)):
         if s1[i] == s2[i]:
@@ -182,7 +157,6 @@ def cosine_sim(a: Optional[np.ndarray], b: Optional[np.ndarray]) -> float:
 def deterministic_hash_vector(s: str, dim: int = CANON_DIM, seedfold: int = 0) -> np.ndarray:
     if s is None:
         s = ""
-    # stable seed from sha256
     h = hashlib.sha256(s.encode("utf-8") + struct.pack("I", seedfold)).digest()
     seed = int.from_bytes(h[:8], "big")
     rnd = random.Random(seed)
@@ -191,16 +165,10 @@ def deterministic_hash_vector(s: str, dim: int = CANON_DIM, seedfold: int = 0) -
     return vec / (norm + 1e-12) if norm > 0 else vec
 
 def extract_embedding_from_field(value: Any) -> Optional[np.ndarray]:
-    """
-    The raw JSON may contain embedding lists or lists of lists.
-    This function tries to detect and convert numeric lists into numpy arrays.
-    """
     if value is None:
         return None
-    # if value is already numeric list
     if isinstance(value, list) and value and all(isinstance(x, (int, float)) for x in value):
         return np.array(value, dtype=np.float32)
-    # if value is a list of numeric lists, compute mean
     if isinstance(value, list) and value and isinstance(value[0], list) and all(isinstance(el, (list, tuple, np.ndarray)) for el in value):
         arrs = []
         for el in value:
@@ -210,19 +178,16 @@ def extract_embedding_from_field(value: Any) -> Optional[np.ndarray]:
                 arrs.append(np.array(el, dtype=np.float32))
         if arrs:
             return np.vstack(arrs).mean(axis=0)
-    # not an embedding
     return None
 
 # ---------------------------
 # Field-level similarity computation
 # ---------------------------
 def username_similarity(a_raw: Dict[str,Any], b_raw: Dict[str,Any]) -> float:
-    # try canonical fields
     a_user = (a_raw.get("profile_id") or a_raw.get("username") or a_raw.get("user_id") or a_raw.get("Username"))
     b_user = (b_raw.get("profile_id") or b_raw.get("username") or b_raw.get("user_id") or b_raw.get("Username"))
     if a_user is None or b_user is None:
         return 0.0
-    # both might be lists -> join
     def to_str(u):
         if isinstance(u, list):
             return " ".join(map(str,u))
@@ -233,7 +198,6 @@ def username_similarity(a_raw: Dict[str,Any], b_raw: Dict[str,Any]) -> float:
         return 0.0
     if a_s == b_s:
         return 1.0
-    # strong: jaro_winkler on normalized username
     jw = jaro_winkler(a_s, b_s)
     return jw
 
@@ -250,10 +214,8 @@ def name_similarity(a_raw: Dict[str,Any], b_raw: Dict[str,Any]) -> float:
     b_s = normalize_text(to_str(b_name))
     if not a_s or not b_s:
         return 0.0
-    # try Jaro-Winkler and normalized Levenshtein and average them
     jw = jaro_winkler(a_s, b_s)
     lv = normalized_levenshtein(a_s, b_s)
-    # also account for token overlap (same family name)
     a_tokens = set(a_s.split())
     b_tokens = set(b_s.split())
     jacc = len(a_tokens & b_tokens) / max(1, len(a_tokens | b_tokens))
@@ -276,7 +238,6 @@ def location_similarity(a_raw: Dict[str,Any], b_raw: Dict[str,Any]) -> float:
     return jw
 
 def semantic_similarity_field(a_emb: Optional[np.ndarray], b_emb: Optional[np.ndarray]) -> float:
-    # safe cosine - if dims mismatch returns 0
     return cosine_sim(a_emb, b_emb)
 
 # ---------------------------
@@ -286,27 +247,23 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
     prepared = []
     for p in raw_profiles:
         item = {"__orig__": p, "source": source_name}
-        # normalized strings
         item["norm"] = {}
-        # username/name/location as normalized strings
         username_candidates = (p.get("profile_id") or p.get("username") or p.get("user_id") or p.get("Username"))
         if username_candidates is not None:
             if isinstance(username_candidates, list):
                 username_candidates = " ".join(map(str, username_candidates))
             item["norm"]["username"] = normalize_text(str(username_candidates))
-        # name
         name_val = p.get("full_name") or p.get("fullName") or p.get("name")
         if name_val is not None:
             if isinstance(name_val, list):
                 name_val = " ".join(map(str, name_val))
             item["norm"]["name"] = normalize_text(str(name_val))
-        # location
         loc = p.get("location")
         if loc is not None:
             if isinstance(loc, list):
                 loc = " ".join(map(str, loc))
             item["norm"]["location"] = normalize_text(str(loc))
-        # headline/bio/raw long text (concat fields that might be semantically relevant)
+
         bio_fields = []
         for k in ("headline", "about", "bio", "description"):
             v = p.get(k)
@@ -315,24 +272,18 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
                     bio_fields.append(" ".join(map(str, v)))
                 else:
                     bio_fields.append(str(v))
-        # also include company/company description if present
         if p.get("company"):
             bio_fields.append(str(p.get("company")))
         if p.get("repo_descriptions") and isinstance(p.get("repo_descriptions"), list):
-            # join short list of repo descriptions, but only if they're strings/numeric
             joined = " ".join(str(x) for x in p.get("repo_descriptions") if isinstance(x, (str, int, float)))
             if joined:
                 bio_fields.append(joined)
-        # --- projects: robust extraction (list of dicts or list of strings) ---
-        # --- inside prepare_profiles, after projects_text ---
         if p.get("projects") and isinstance(p.get("projects"), list):
             proj_texts = []
             for proj in p.get("projects"):
                 if proj is None:
                     continue
-                # project may be a dict like {"name": "...", "description": "..."}
                 if isinstance(proj, dict):
-                    # flexible keys
                     title = proj.get("name") or proj.get("title") or proj.get("project_name") or ""
                     desc  = proj.get("description") or proj.get("descriptions") or proj.get("details") or ""
                     if isinstance(title, list):
@@ -343,14 +294,11 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
                         proj_texts.append(str(title))
                     if desc:
                         proj_texts.append(str(desc))
-                # sometimes projects is already a list of strings
                 elif isinstance(proj, (str, int, float)):
                     proj_texts.append(str(proj))
-                # ignore other weird types
             if proj_texts:
                 joined_projects = " ".join(proj_texts)
                 bio_fields.append(joined_projects)
-                # also add a dedicated projects normalized field (useful later)
                 item["norm"]["projects_text"] = normalize_text(joined_projects)
             else:
                 item["norm"]["projects_text"] = ""
@@ -358,16 +306,12 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
             if "emb" not in item:
                 item["emb"] = {}
             item["emb"]["projects"] = deterministic_hash_vector(proj_text, dim=canonical_dim) if proj_text else None
-
         else:
             item["norm"]["projects_text"] = ""
-        
+
         item["norm"]["bio_text"] = normalize_text(" ".join(bio_fields)) if bio_fields else ""
 
-        # embeddings: try to extract numeric embeddings from fields, fallback to deterministic
         item["emb"] = {}
-        # check common possible embedding fields in the raw record
-        # (user might already have precomputed fields like 'embedding', 'bio_embedding', etc.)
         extracted = None
         for candidate_key in ("embedding","emb","bio_embedding","vector","vectors"):
             if candidate_key in p:
@@ -375,28 +319,23 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
                 if extracted is not None:
                     item["emb"]["global"] = extracted
                     break
-        # field-level extraction
-        # repo_names/repo_descriptions could be lists of strings; if not numeric embeddings, we will create deterministic vectors
-        # attempt to extract field embeddings if present in JSON
+
         item["emb"]["bio"] = None
         if "bio" in p:
             emb = extract_embedding_from_field(p.get("bio"))
             if emb is not None:
                 item["emb"]["bio"] = emb
-        # try repo_descriptions
         if "repo_descriptions" in p:
             emb = extract_embedding_from_field(p.get("repo_descriptions"))
             if emb is not None:
                 item["emb"]["repo_descriptions"] = emb
-        # names: rarely embedded, so will use deterministic hashing
-        # now ensure we have deterministic vectors for fields we will compare semantically
+
         if item["norm"].get("bio_text"):
             if item["emb"].get("bio") is None:
                 item["emb"]["bio"] = deterministic_hash_vector(item["norm"]["bio_text"], dim=canonical_dim)
         else:
             item["emb"]["bio"] = None
 
-        # repo_names: if present as strings -> deterministic
         rn = p.get("repo_names")
         if rn:
             if isinstance(rn, list):
@@ -407,20 +346,16 @@ def prepare_profiles(raw_profiles: List[Dict[str,Any]], source_name: str, canoni
         else:
             item["emb"]["repo_names"] = None
 
-        # repo_descriptions
         if p.get("repo_descriptions"):
-            # if numeric embeddings present, extract_embedding_from_field handles it above
             if item["emb"].get("repo_descriptions") is None:
                 joined = " ".join(str(x) for x in p.get("repo_descriptions") if isinstance(x, (str, int, float)))
                 item["emb"]["repo_descriptions"] = deterministic_hash_vector(normalize_text(joined), dim=canonical_dim) if joined else None
 
-        # name deterministic embedding (optional)
         if item["norm"].get("name"):
             item["emb"]["name"] = deterministic_hash_vector(item["norm"]["name"], dim=canonical_dim)
         else:
             item["emb"]["name"] = None
 
-        # keep raw original too
         prepared.append(item)
     return prepared
 
@@ -469,46 +404,53 @@ def score_pair(a_prep: Dict[str,Any], b_prep: Dict[str,Any], field_weights: Dict
 # Blocking / Candidate selection - simple but effective
 # ---------------------------
 def build_index(prepared: List[Dict[str,Any]], key_field: str = "username") -> Dict[str, List[int]]:
-    """
-    Build a dict mapping a blocking key -> list of indices.
-    Here we use first two characters of username or name token as a block key.
-    """
     idx = {}
     for i, p in enumerate(prepared):
         key = ""
         if p["norm"].get(key_field):
-            key = p["norm"][key_field][:2]  # first two chars
+            key = p["norm"][key_field][:2]
         else:
-            # fallback to name
             name = p["norm"].get("name","")
             key = name[:2] if name else ""
         idx.setdefault(key, []).append(i)
     return idx
 
 # ---------------------------
-# Main pairwise function
+# Three-way matching (triplets) ONLY
 # ---------------------------
-def pairwise_match(a_name: str, b_name: str,
-                   selected_fields: Optional[List[str]] = None,
-                   threshold: float = THRESHOLD,
-                   top_k: int = TOP_K,
-                   field_weights: Dict[str,float] = FIELD_WEIGHTS,
-                   show_diag: bool = True):
+def three_way_match(a_name: str, b_name: str, c_name: str,
+                    selected_fields: Optional[List[str]] = None,
+                    threshold: float = THRESHOLD,
+                    top_k: int = TOP_K,
+                    field_weights: Dict[str,float] = FIELD_WEIGHTS,
+                    max_candidates_per_side: int = 50,
+                    show_diag: bool = True):
+    """
+    Perform 3-way matching between datasets A, B, C.
+    Combined triplet score = mean(score_ab, score_ac, score_bc).
+    Only this function is executed by the script.
+    """
+
     a_path = EMBED_FILES[a_name]
     b_path = EMBED_FILES[b_name]
+    c_path = EMBED_FILES[c_name]
+
     rawA = load_json(a_path)
     rawB = load_json(b_path)
+    rawC = load_json(c_path)
     if show_diag:
-        print(f"Loaded {len(rawA)} from {a_name}, {len(rawB)} from {b_name}")
-        print("sample raw keys A:", {k: type(v).__name__ for k,v in (rawA[0].items() if rawA else [])})
-        if rawB:
-            print("sample raw keys B:", {k: type(v).__name__ for k,v in rawB[0].items()})
-    if selected_fields is None:
-        selected_fields = PAIR_FIELDS.get((a_name, b_name), None)
+        print(f"Loaded {len(rawA)} from {a_name}, {len(rawB)} from {b_name}, {len(rawC)} from {c_name}")
 
-    # quick attempt to detect canonical dim from any numeric embedding present in B
+    if selected_fields is None:
+        selected_fields = list(set(
+            (PAIR_FIELDS.get((a_name,b_name), []) or []) +
+            (PAIR_FIELDS.get((a_name,c_name), []) or []) +
+            (PAIR_FIELDS.get((b_name,c_name), []) or [])
+        ))
+
+    # detect canonical dim (try B then C)
     detected_dim = None
-    for p in rawB:
+    for p in rawB + rawC:
         for k,v in p.items():
             emb = extract_embedding_from_field(v)
             if emb is not None:
@@ -522,86 +464,124 @@ def pairwise_match(a_name: str, b_name: str,
 
     A = prepare_profiles(rawA, a_name, canonical_dim)
     B = prepare_profiles(rawB, b_name, canonical_dim)
+    C = prepare_profiles(rawC, c_name, canonical_dim)
+
     if show_diag and A:
         print(f"[diag] example prepared A fields: {list(A[0]['norm'].keys())}, emb keys: {list(A[0]['emb'].keys())}")
-    if show_diag and B:
-        print(f"[diag] example prepared B fields: {list(B[0]['norm'].keys())}, emb keys: {list(B[0]['emb'].keys())}")
 
-    # build blocking index on B
+    # build blocking indices
     b_index = build_index(B, key_field="username")
+    c_index = build_index(C, key_field="username")
 
-    raw_matches = []
+    triplet_results = []
+
     for i, a in enumerate(A):
-        # skip if no useful content
         if not (a["norm"].get("username") or a["norm"].get("name") or a["norm"].get("bio_text")):
             continue
 
         block_key = (a["norm"].get("username") or a["norm"].get("name") or "")[:2]
-        candidates_idx = set()
+        candidates_b = set()
+        candidates_c = set()
         if block_key in b_index:
-            candidates_idx.update(b_index[block_key])
-        # also attempt more relaxed blocks: first char or empty-key
+            candidates_b.update(b_index[block_key])
         if block_key and block_key[:1] in b_index:
-            candidates_idx.update(b_index[block_key[:1]])
-        # if still empty, fallback to full scan (but we try to avoid it)
-        if not candidates_idx:
-            candidates_idx = set(range(len(B)))
+            candidates_b.update(b_index[block_key[:1]])
+        if block_key in c_index:
+            candidates_c.update(c_index[block_key])
+        if block_key and block_key[:1] in c_index:
+            candidates_c.update(c_index[block_key[:1]])
+        if not candidates_b:
+            candidates_b = set(range(min(len(B), max_candidates_per_side)))
+        if not candidates_c:
+            candidates_c = set(range(min(len(C), max_candidates_per_side)))
 
-        scored = []
-        for j in candidates_idx:
-            b = B[j]
-            sc = score_pair(a, b, field_weights, fields_to_use=selected_fields)
-            if sc["score"] >= threshold:
-                scored.append((sc["score"], j, sc))
+        # preliminary scores a-b and a-c, keep top-N per side
+        scored_b = []
+        for j in candidates_b:
+            sc_ab = score_pair(a, B[j], field_weights, fields_to_use=selected_fields)
+            scored_b.append((sc_ab["score"], j, sc_ab))
+        scored_b.sort(key=lambda x: x[0], reverse=True)
+        top_b = scored_b[:max_candidates_per_side]
 
-        # keep top_k
-        scored.sort(key=lambda x: x[0], reverse=True)
-        for score, j, sc in scored[:top_k]:
-            raw_matches.append({
-                "profileA_index": i,
-                "profileA_id": (A[i]["__orig__"].get("profile_id") or A[i]["__orig__"].get("username") or A[i]["__orig__"].get("user_id")),
-                "profileB_index": j,
-                "profileB_id": (B[j]["__orig__"].get("profile_id") or B[j]["__orig__"].get("username") or B[j]["__orig__"].get("user_id")),
-                "score": float(score),
-                "per_field": sc["per_field"]
-            })
+        scored_c = []
+        for k in candidates_c:
+            sc_ac = score_pair(a, C[k], field_weights, fields_to_use=selected_fields)
+            scored_c.append((sc_ac["score"], k, sc_ac))
+        scored_c.sort(key=lambda x: x[0], reverse=True)
+        top_c = scored_c[:max_candidates_per_side]
 
-    # keep only top match per A
+        # cross product but limited by top_k on each side to avoid blowup
+        for score_ab, j, sc_ab in top_b[:top_k]:
+            for score_ac, k, sc_ac in top_c[:top_k]:
+                sc_bc = score_pair(B[j], C[k], field_weights, fields_to_use=selected_fields)
+                score_bc = sc_bc["score"]
+                combined_score = float((score_ab + score_ac + score_bc) / 3.0)
+
+                if combined_score >= threshold:
+                    per_field_combined = {}
+                    fields_all = set()
+                    fields_all.update(sc_ab["per_field"].keys())
+                    fields_all.update(sc_ac["per_field"].keys())
+                    fields_all.update(sc_bc["per_field"].keys())
+                    for f in fields_all:
+                        vals = []
+                        if f in sc_ab["per_field"]:
+                            vals.append(sc_ab["per_field"][f]["score"])
+                        if f in sc_ac["per_field"]:
+                            vals.append(sc_ac["per_field"][f]["score"])
+                        if f in sc_bc["per_field"]:
+                            vals.append(sc_bc["per_field"][f]["score"])
+                        per_field_combined[f] = {
+                            "avg_score": sum(vals) / len(vals) if vals else 0.0,
+                            "sources": {
+                                "a-b": sc_ab["per_field"].get(f),
+                                "a-c": sc_ac["per_field"].get(f),
+                                "b-c": sc_bc["per_field"].get(f)
+                            }
+                        }
+
+                    triplet_results.append({
+                        "profileA_index": i,
+                        "profileA_id": (A[i]["__orig__"].get("profile_id") or A[i]["__orig__"].get("username") or A[i]["__orig__"].get("user_id")),
+                        "profileB_index": j,
+                        "profileB_id": (B[j]["__orig__"].get("profile_id") or B[j]["__orig__"].get("username") or B[j]["__orig__"].get("user_id")),
+                        "profileC_index": k,
+                        "profileC_id": (C[k]["__orig__"].get("profile_id") or C[k]["__orig__"].get("username") or C[k]["__orig__"].get("user_id")),
+                        "score_ab": float(score_ab),
+                        "score_ac": float(score_ac),
+                        "score_bc": float(score_bc),
+                        "combined_score": float(combined_score),
+                        "per_field_combined": per_field_combined
+                    })
+
+    # keep top1 triplet per A by combined_score
     best_per_A = {}
-    for m in raw_matches:
-        ida = m["profileA_id"] if m["profileA_id"] is not None else m["profileA_index"]
-        if ida not in best_per_A or m["score"] > best_per_A[ida]["score"]:
-            best_per_A[ida] = m
-    final_matches = list(best_per_A.values())
+    for t in triplet_results:
+        ida = t["profileA_id"] if t["profileA_id"] is not None else t["profileA_index"]
+        if ida not in best_per_A or t["combined_score"] > best_per_A[ida]["combined_score"]:
+            best_per_A[ida] = t
+    final_triplets = list(best_per_A.values())
 
     if show_diag:
-        print(f"[diag] matches considered: {len(raw_matches)}; final top1: {len(final_matches)}")
+        print(f"[diag] triplets considered: {len(triplet_results)}; final top1 per A: {len(final_triplets)}")
 
-    out = OUT_TEMPLATE.format(a=a_name, b=b_name)
-    save_json(final_matches, out)
+    out = THREE_OUT_TEMPLATE.format(a=a_name, b=b_name, c=c_name)
+    save_json(final_triplets, out)
     if show_diag:
-        print(f"Saved {len(final_matches)} matches to {out}")
-    return final_matches
-
+        print(f"Saved {len(final_triplets)} triplets to {out}")
+    return final_triplets
 
 # ---------------------------
-# run as script
+# run as script (three-way only)
 # ---------------------------
 if __name__ == "__main__":
-    pairs_to_match = [
-        ("linkedin", "github"),
-        ("linkedin", "twitter"),
-        ("github", "twitter"),
-        ("github", "linkedin"),
-        ("twitter", "github"),
-        ("twitter", "linkedin"),
-    ]
-
-    for a, b in pairs_to_match:
-        config = PAIR_CONFIGS.get((a,b), {})
-        threshold = config.get("threshold", THRESHOLD)
-        top_k = config.get("top_k", TOP_K)
-        field_weights = config.get("field_weights", FIELD_WEIGHTS)
-        fields_to_use = PAIR_FIELDS.get((a,b), None)
-
-        pairwise_match(a, b, threshold=threshold, top_k=top_k, field_weights=field_weights, selected_fields=fields_to_use)
+    # Example: run only three-way matching between linkedin, github, twitter
+    try:
+        three_way_match("linkedin", "github", "twitter",
+                        threshold=0.7,
+                        top_k=5,
+                        field_weights=FIELD_WEIGHTS,
+                        max_candidates_per_side=100,
+                        show_diag=True)
+    except Exception as e:
+        print(f"Error running three-way match: {e}")
