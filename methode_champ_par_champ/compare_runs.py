@@ -13,12 +13,9 @@ EMBED_FILES = {
 }
 
 PAIRS = [
-    ("github","linkedin"),
-    ("github","twitter"),
-    ("linkedin","github"),
-    ("linkedin","twitter"),
-    ("twitter","github"),
-    ("twitter","linkedin")
+    ("linkedin", "github"),
+    ("linkedin", "twitter"),
+    ("github", "twitter"),
 ]
 
 def load_json(path):

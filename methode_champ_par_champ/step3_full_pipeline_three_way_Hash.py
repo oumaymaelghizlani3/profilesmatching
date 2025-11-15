@@ -21,11 +21,11 @@ os.makedirs("results", exist_ok=True)
 
 # field weights (tuneable)
 FIELD_WEIGHTS = {
-    "username": 0.30,
-    "name": 0.25,
-    "bio": 0.15,               # headline/bio semantic
-    "repo_names": 0.1,
-    "repo_descriptions": 0.1,
+    "username": 0.60,
+    "name": 0.60,
+    "bio": 0.20,               # headline/bio semantic
+    "repo_names": 0.10,
+    "repo_descriptions": 0.10,
     "location": 0.05,
     "_default": 0.05
 }
